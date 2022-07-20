@@ -1,4 +1,4 @@
-"""High-level decoder
+"""High-level decoder.
 
 The I2C decoder generates events on every start, stop and byte. The decoder
 collects each events and combines these into transactions (or functions).
@@ -8,6 +8,10 @@ device and represented as such in the Logic Analyzer.
 """
 
 import enum
+import typing
+
+from saleae.analyzers import AnalyzerFrame
+from saleae.data import GraphTimeDelta
 
 from .types import Transaction
 
@@ -18,28 +22,35 @@ class State(enum.Enum):
     Data = 3
 
 
+T = typing.TypeVar("T", bound="Decoder")
+
+
 class Decoder:
     """Decoder to combine I2C frames into transactions."""
 
-    def __init__(self):
+    def __init__(self: T) -> None:
         self._state = State.Idle
         self._transaction = Transaction()
         # self._count = 0
         self._timeout = None
 
-    def set_timeout(self, timeout):
+    def set_timeout(self: T, timeout: typing.Optional[GraphTimeDelta]) -> None:
         """Set a timeout to take into account.
 
         Providing a datetime object will enable timeout checks when processing
         I2C events. Settings timeout to None (default) disables these checks.
 
         Args:
-            timeout: either a datetime type or None
+            timeout: either a datetime (like) type or None
         """
         self._timeout = timeout
 
-    def _timeout_check(self, frame):
-        """Checks if a timeout occoured and resets the decoder."""
+    def _timeout_check(self: T, frame: AnalyzerFrame) -> None:
+        """Checks if a timeout occoured and resets the decoder.
+
+        Args:
+            frame: an I2C event.
+        """
         if self._timeout is None:
             return
 
@@ -50,26 +61,22 @@ class Decoder:
         if diff >= self._timeout:
             self._state = State.Idle
 
-    def process(self, frame):
+    def process(self: T, frame: AnalyzerFrame) -> typing.Optional[Transaction]:
         """Process a I2C event.
 
         Handles:
         - plain transaction (start - address - data - stop)
         - restarts (identified by start, within timeout period)
 
-        Returns
+        Args:
+            frame: an I2C event.
+
+        Returns:
             A Transaction when completely decoded.
 
         Todo:
             Handle ACK/NACK
         """
-
-        # if self._count < 30:
-        #     self._count += 1
-        #     print(vars(frame))
-        # else:
-        #     return None
-
         self._timeout_check(frame)
 
         if self._state == State.Idle:

@@ -1,10 +1,27 @@
 """Types to represent Smart Battery System functions."""
 
 import enum
+import typing
 
 
-class Battery(enum.Enum):
-    """Functions for: Smart Battery Data Specification (rev 1.1)"""
+T = typing.TypeVar("T", bound="SbsCommand")
+
+
+class SbsCommand:
+    """Generic interface for SBS commands."""
+
+    @classmethod
+    def from_int(cls: T, cmd_code: int) -> T:
+        """Create a Battery enum from a command code."""
+        return cls(cmd_code)
+
+    def __str__(self: T) -> str:
+        """Generate a string for a given Battery enum."""
+        return self.name
+
+
+class Battery(SbsCommand, enum.Enum):
+    """Functions for: Smart Battery Data Specification (rev 1.1)."""
 
     ManufacturerAccess = 0x00
     RemainingCapacityAlarm = 0x01
@@ -40,18 +57,9 @@ class Battery(enum.Enum):
     DeviceChemistry = 0x22
     ManufacturerData = 0x23
 
-    @classmethod
-    def from_int(cls, cmd_code: int):
-        """Create a Battery enum from a command code"""
-        return cls(cmd_code)
 
-    def __str__(self):
-        """Generate a string for a given Battery enum"""
-        return self.name
-
-
-class FuelCell(enum.Enum):
-    """Functions for: SBDS – Addendum For Fuel Cell Systems (rel 1.02)"""
+class FuelCell(SbsCommand, enum.Enum):
+    """Functions for: SBDS – Addendum For Fuel Cell Systems (rel 1.02)."""
 
     DesignMaxPower = 0x24
     StartTime = 0x25
@@ -61,28 +69,10 @@ class FuelCell(enum.Enum):
     FCMode = 0x29
     AutSoftOFF = 0x2A
 
-    @classmethod
-    def from_int(cls, cmd_code: int):
-        """Create a FuelCell enum from a command code"""
-        return cls(cmd_code)
 
-    def __str__(self):
-        """Generate a string for a given FuelCell enum"""
-        return self.name
-
-
-class SystemManager(enum.Enum):
-    """Functions for: Smart Battery System Manager Specification (rev 1.1)"""
+class SystemManager(SbsCommand, enum.Enum):
+    """Functions for: Smart Battery System Manager Specification (rev 1.1)."""
 
     BatterySystemState = 0x01
     BatterySystemStateCont = 0x02
     BatterySystemInfo = 0x04
-
-    @classmethod
-    def from_int(cls, cmd_code: int):
-        """Create a SystemManager enum from a command code"""
-        return cls(cmd_code)
-
-    def __str__(self):
-        """Generate a string for a given SystemManager enum"""
-        return self.name

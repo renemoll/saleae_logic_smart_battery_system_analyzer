@@ -1,19 +1,30 @@
+import typing
+
 from saleae.analyzers import HighLevelAnalyzer, AnalyzerFrame, StringSetting
 from saleae.data import GraphTimeDelta
 
 from sbs_decoder import Decoder, Transaction
-from smart_battery_system import to_sbs_command, register_device_address, Battery, FuelCell
+from smart_battery_system import (
+    to_sbs_command,
+    register_device_address,
+    Battery,
+    FuelCell,
+    SbsCommand,
+)
 
 
 def to_command(device_address: int, cmd_code: int) -> str:
+    """Helper to convert a command code to a command name."""
     try:
         return str(to_sbs_command(device_address, cmd_code))
     except KeyError:
         return f"Unknown command ({cmd_code:02x})"
 
 
-def format_payload(device_address: int, cmd_code: int, payload: bytearray):
-    def is_string(cmd):
+def format_payload(device_address: int, cmd_code: int, payload: bytearray) -> str:
+    """Helper to convert the payload into a human readable string."""
+
+    def is_string(cmd: SbsCommand) -> bool:
         return cmd in (
             Battery.ManufacturerName,
             Battery.DeviceName,
@@ -28,13 +39,16 @@ def format_payload(device_address: int, cmd_code: int, payload: bytearray):
 
         tmp = int.from_bytes(payload, byteorder="little")
         return f"0x{tmp:02x}"
-    except:
+    except KeyError:
         return payload
 
 
-def generate_write_cmd_payload_result(transaction):
+def generate_write_cmd_payload_result(transaction: Transaction) -> AnalyzerFrame:
+    """Generate a WRITE transaction highlight."""
     cmd = to_command(transaction.device_address, transaction.payload[0])
-    payload = format_payload(transaction.device_address, transaction.payload[0], transaction.payload[1:])
+    payload = format_payload(
+        transaction.device_address, transaction.payload[0], transaction.payload[1:]
+    )
     return AnalyzerFrame(
         "write_cmd_payload",
         transaction.start_time,
@@ -47,7 +61,8 @@ def generate_write_cmd_payload_result(transaction):
     )
 
 
-def generate_write_cmd_result(transaction):
+def generate_write_cmd_result(transaction: Transaction) -> AnalyzerFrame:
+    """Generate a WRITE with data highlight."""
     cmd = to_command(transaction.device_address, transaction.payload[0])
     return AnalyzerFrame(
         "write_cmd",
@@ -57,9 +72,12 @@ def generate_write_cmd_result(transaction):
     )
 
 
-def generate_read_cmd_payload_result(write_cmd, read_cmd):
+def generate_read_cmd_payload_result(write_cmd: Transaction, read_cmd: Transaction) -> AnalyzerFrame:
+    """Generate a READ transaction highlight."""
     cmd = to_command(write_cmd.device_address, write_cmd.payload[0])
-    payload = format_payload(write_cmd.device_address, write_cmd.payload[0], read_cmd.payload)
+    payload = format_payload(
+        write_cmd.device_address, write_cmd.payload[0], read_cmd.payload
+    )
     return AnalyzerFrame(
         "read_cmd_payload",
         write_cmd.start_time,
@@ -72,7 +90,8 @@ def generate_read_cmd_payload_result(write_cmd, read_cmd):
     )
 
 
-def generate_read_payload_result(transaction):
+def generate_read_payload_result(transaction: Transaction) -> AnalyzerFrame:
+    """Generate a READ with data highlight."""
     return AnalyzerFrame(
         "read_payload",
         transaction.start_time,
@@ -84,13 +103,17 @@ def generate_read_payload_result(transaction):
     )
 
 
-def generate_nack_result(transaction):
+def generate_nack_result(transaction: Transaction) -> AnalyzerFrame:
+    """Generate a NACK highlight."""
     return AnalyzerFrame(
         "nack",
         transaction.start_time,
         transaction.end_time,
         {"device_address": f"0x{transaction.device_address:02x}"},
     )
+
+
+T = typing.TypeVar("T", bound="Hla")
 
 
 class Hla(HighLevelAnalyzer):
@@ -113,12 +136,8 @@ class Hla(HighLevelAnalyzer):
         },
     }
 
-    def __init__(self):
-        """
-        Initialize HLA.
-
-        Settings can be accessed using the same name used above.
-        """
+    def __init__(self: T) -> None:
+        """Initialize the HLA."""
         print("Smart Battery System Analyzer")
         print("Custom addresses:", self.custom_battery)
 
@@ -134,28 +153,34 @@ class Hla(HighLevelAnalyzer):
         # List of decoded transactions ready to be processed
         self._queue = []
 
-    def __process_frame(self, frame: AnalyzerFrame):
-        """Processes an AnalyzerFrame
+    def __process_frame(self: T, frame: AnalyzerFrame) -> bool:
+        """Decodes AnalyzerFrame and queues the result.
 
-        Returns
-            True when a complete frame is decoded
+        Args:
+            frame: an I2C event.
+
+        Returns:
+            True when a complete transaction is decoded, False otherwise.
         """
-
         result = self._decoder.process(frame)
         if result is None:
             return False
 
-        # print(f"DECODED: {result}")
         self._queue.append(result)
         return True
 
-    def decode(self, frame: AnalyzerFrame):
-        """
-        Process a frame from the input analyzer, and optionally return a single `AnalyzerFrame` or a list of `AnalyzerFrame`s.
+    def decode(self: T, frame: AnalyzerFrame) -> typing.Optional[AnalyzerFrame]:
+        """Decode an I2C frame and combine into transactions.
 
-        The type and data values in `frame` will depend on the input analyzer.
-        """
+        Process a frame from the I2C input analyzer, and optionally return a
+        single AnalyzerFrame. A AnalyzerFrame represents a complete transaction.
 
+        Args:
+            frame: an I2C event.
+
+        Returns:
+            AnalyzerFrame when a transaction is complete.
+        """
         do_parsing = self.__process_frame(frame)
         if do_parsing:
             index = 0
