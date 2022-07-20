@@ -1,0 +1,13 @@
+{
+  "name": "Smart Battery System Analyzer",
+  "apiVersion": "1.0.0",
+  "author": "René Moll",
+  "version": "0.0.1",
+  "description": "Decodes the Smart Battery Data (rev 1.1)",
+  "extensions": {
+    "Smart Battery System Analyzer": {
+      "type": "HighLevelAnalyzer",
+      "entryPoint": "HighLevelAnalyzer.Hla"
+    }
+  }
+}
